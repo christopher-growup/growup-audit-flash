@@ -76,6 +76,12 @@
       "name": "Notion — Chercher Contact",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
+      "credentials": {
+        "notionApi": {
+          "id": "fxZKqJ32AsCgA1ln",
+          "name": "Notion Grow Up Consulting"
+        }
+      },
       "position": [660, 300]
     },
     {
@@ -113,6 +119,12 @@
       "name": "Notion — MAJ Contact",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
+      "credentials": {
+        "notionApi": {
+          "id": "fxZKqJ32AsCgA1ln",
+          "name": "Notion Grow Up Consulting"
+        }
+      },
       "position": [1100, 200]
     },
     {
@@ -141,6 +153,12 @@
       "name": "Notion — Creer Contact",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
+      "credentials": {
+        "notionApi": {
+          "id": "fxZKqJ32AsCgA1ln",
+          "name": "Notion Grow Up Consulting"
+        }
+      },
       "position": [1100, 400]
     },
     {
@@ -168,6 +186,12 @@
       "name": "Notion — Chercher Transaction ouverte",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
+      "credentials": {
+        "notionApi": {
+          "id": "fxZKqJ32AsCgA1ln",
+          "name": "Notion Grow Up Consulting"
+        }
+      },
       "position": [1540, 300]
     },
     {
@@ -216,6 +240,12 @@
       "name": "Notion — Creer Transaction",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
+      "credentials": {
+        "notionApi": {
+          "id": "fxZKqJ32AsCgA1ln",
+          "name": "Notion Grow Up Consulting"
+        }
+      },
       "position": [1980, 400]
     },
     {
@@ -247,6 +277,12 @@
       "name": "Notion — Creer Soumission LM",
       "type": "n8n-nodes-base.notion",
       "typeVersion": 2.2,
+      "credentials": {
+        "notionApi": {
+          "id": "fxZKqJ32AsCgA1ln",
+          "name": "Notion Grow Up Consulting"
+        }
+      },
       "position": [2420, 300]
     },
     {
