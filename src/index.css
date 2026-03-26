@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  /* Midnight Blue palette */
+  --color-midnight-lightest: #e5eaef;
+  --color-midnight-lighter: #ccd6e0;
+  --color-midnight-light: #4c7093;
+  --color-midnight: #003366;
+  --color-midnight-dark: #002851;
+  --color-midnight-darker: #001428;
+  --color-midnight-darkest: #000f1e;
+
+  /* Fire Bush palette */
+  --color-fire-lightest: #fcf4eb;
+  --color-fire-lighter: #f9e9d7;
+  --color-fire-light: #ebb475;
+  --color-fire: #e3943b;
+  --color-fire-dark: #b5762f;
+  --color-fire-darkest: #442c11;
+
+  /* Neutral */
+  --color-neutral-darkest: #0b0705;
+
+  /* Fonts */
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-midnight-darkest text-midnight-lightest font-sans antialiased;
+  }
+}
