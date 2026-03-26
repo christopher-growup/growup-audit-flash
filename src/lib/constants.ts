@@ -161,9 +161,9 @@ export const SUGGESTED_STACKS: Record<ProcessId, string[]> = {
   relances: ["Make", "Tiime", "Gmail", "Notion"],
   reporting: ["Make", "Google Sheets", "Notion", "Looker Studio"],
   facturation: ["Make", "Tiime", "Notion"],
-  commercial: ["Make", "n8n", "Notion CRM", "Gmail"],
+  commercial: ["n8n", "Notion CRM", "Gmail", "Brevo"],
   onboarding: ["Make", "Notion", "Google Drive", "Gmail"],
-  admin: ["Make", "n8n", "Google Sheets", "Notion"],
+  admin: ["n8n", "Google Sheets", "Notion", "Slack"],
 };
 
 export const AUTOMATION_MONTHLY_COST: Record<ProcessId, number> = {
