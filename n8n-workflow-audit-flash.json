@@ -1,0 +1,516 @@
+{
+  "name": "Audit Flash — New Lead",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "audit-flash-lead",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 300],
+      "webhookId": "audit-flash-lead"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validation du payload\nconst body = $input.first().json.body;\n\nconst email = (body.email || '').trim().toLowerCase();\nconst firstName = (body.firstName || '').trim();\nconst consentRgpd = body.consentRgpd === true;\n\n// Validation email basique\nconst emailValid = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n\nif (!consentRgpd) {\n  throw new Error('Consentement RGPD manquant');\n}\nif (!emailValid) {\n  throw new Error('Email invalide: ' + email);\n}\nif (!firstName) {\n  throw new Error('Prenom manquant');\n}\n\n// Normaliser le payload\nreturn [{\n  json: {\n    email,\n    firstName,\n    phone: (body.phone || '').trim(),\n    companyName: (body.companyName || '').trim(),\n    sector: body.sector || 'autre',\n    teamSize: body.teamSize || 0,\n    revenueRange: body.revenueRange || '',\n    selectedProcess: body.selectedProcess || '',\n    answers: body.answers || {},\n    result: body.result || {},\n    consentRgpd: true,\n    source: body.source || 'audit-flash',\n    utmCampaign: body.utmCampaign || '',\n    utmMedium: body.utmMedium || '',\n    submittedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "validate-payload",
+      "name": "Valider Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.brevo.com/v3/contacts/{{ encodeURIComponent($json.email) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "brevo-get-contact",
+      "name": "Brevo — Chercher Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Brevo API Key"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "contact-exists",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "number", "operation": "exists" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "brevo-exists-check",
+      "name": "Contact Brevo existe ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.brevo.com/v3/contacts/{{ encodeURIComponent($('Valider Payload').first().json.email) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"attributes\": {\n    \"PRENOM\": \"{{ $('Valider Payload').first().json.firstName }}\",\n    \"ENTREPRISE\": \"{{ $('Valider Payload').first().json.companyName }}\",\n    \"SECTEUR\": \"{{ $('Valider Payload').first().json.sector }}\",\n    \"AUDIT_PROCESS\": \"{{ $('Valider Payload').first().json.selectedProcess }}\",\n    \"AUDIT_COST\": {{ $('Valider Payload').first().json.result.annualCost || 0 }}\n  },\n  \"listIds\": [14]\n}",
+        "options": {}
+      },
+      "id": "brevo-update-contact",
+      "name": "Brevo — MAJ Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Brevo API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/contacts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"email\": \"{{ $('Valider Payload').first().json.email }}\",\n  \"attributes\": {\n    \"PRENOM\": \"{{ $('Valider Payload').first().json.firstName }}\",\n    \"ENTREPRISE\": \"{{ $('Valider Payload').first().json.companyName }}\",\n    \"SECTEUR\": \"{{ $('Valider Payload').first().json.sector }}\",\n    \"AUDIT_PROCESS\": \"{{ $('Valider Payload').first().json.selectedProcess }}\",\n    \"AUDIT_COST\": {{ $('Valider Payload').first().json.result.annualCost || 0 }},\n    \"SOURCE\": 5,\n    \"TEMPERATURE\": 1,\n    \"STATUT_COMMERCIAL\": 1,\n    \"SEGMENT\": 2,\n    \"SCORE\": 10\n  },\n  \"listIds\": [14],\n  \"updateEnabled\": false\n}",
+        "options": {}
+      },
+      "id": "brevo-create-contact",
+      "name": "Brevo — Creer Contact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Brevo API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge : reprendre les donnees validees pour la suite\nconst data = $('Valider Payload').first().json;\n\n// Recuperer le Brevo ID\nlet brevoId = null;\ntry {\n  const brevoResponse = $('Brevo — Chercher Contact').first().json;\n  brevoId = brevoResponse.id || null;\n} catch(e) {}\n\nif (!brevoId) {\n  try {\n    const createResponse = $('Brevo — Creer Contact').first().json;\n    brevoId = createResponse.id || null;\n  } catch(e) {}\n}\n\nreturn [{ json: { ...data, brevoId } }];"
+      },
+      "id": "merge-brevo",
+      "name": "Merge Brevo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "c9d816644d8b41b38d4defcc9f5ef6d6",
+          "mode": "id"
+        },
+        "filterType": "string",
+        "filterJson": "={ \"filter\": { \"property\": \"Email\", \"email\": { \"equals\": \"{{ $json.email }}\" } } }",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "notion-search-contact",
+      "name": "Notion — Chercher Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "notion-contact-exists",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "notion-contact-exists",
+      "name": "Contact Notion existe ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Nom entreprise|rich_text", "textContent": "={{ $('Merge Brevo').first().json.companyName }}" },
+            { "key": "Secteur|select", "selectValue": "={{ $('Merge Brevo').first().json.sector }}" },
+            { "key": "Taille equipe|number", "numberValue": "={{ $('Merge Brevo').first().json.teamSize }}" },
+            { "key": "CA approximatif|select", "selectValue": "={{ $('Merge Brevo').first().json.revenueRange }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "notion-update-contact",
+      "name": "Notion — MAJ Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "c9d816644d8b41b38d4defcc9f5ef6d6",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Nom complet|title", "textContent": "={{ $('Merge Brevo').first().json.firstName }}" },
+            { "key": "Prenom|rich_text", "textContent": "={{ $('Merge Brevo').first().json.firstName }}" },
+            { "key": "Email|email", "emailValue": "={{ $('Merge Brevo').first().json.email }}" },
+            { "key": "Telephone|phone_number", "phoneValue": "={{ $('Merge Brevo').first().json.phone }}" },
+            { "key": "Nom entreprise|rich_text", "textContent": "={{ $('Merge Brevo').first().json.companyName }}" },
+            { "key": "Type|select", "selectValue": "Prospect" },
+            { "key": "Source|select", "selectValue": "Lead Magnet" },
+            { "key": "Secteur|select", "selectValue": "={{ $('Merge Brevo').first().json.sector }}" },
+            { "key": "Taille equipe|number", "numberValue": "={{ $('Merge Brevo').first().json.teamSize }}" },
+            { "key": "CA approximatif|select", "selectValue": "={{ $('Merge Brevo').first().json.revenueRange }}" },
+            { "key": "Brevo ID|number", "numberValue": "={{ $('Merge Brevo').first().json.brevoId }}" },
+            { "key": "Consentement RGPD|checkbox", "checkboxValue": true },
+            { "key": "date:Date consentement|date", "date": "={{ $('Merge Brevo').first().json.submittedAt }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "notion-create-contact",
+      "name": "Notion — Creer Contact",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1760, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recuperer l'ID du contact Notion (cree ou existant)\nconst data = $('Merge Brevo').first().json;\nlet notionContactId = null;\nlet notionContactUrl = null;\n\ntry {\n  const existing = $('Notion — MAJ Contact').first().json;\n  notionContactId = existing.id;\n  notionContactUrl = existing.url;\n} catch(e) {}\n\nif (!notionContactId) {\n  try {\n    const created = $('Notion — Creer Contact').first().json;\n    notionContactId = created.id;\n    notionContactUrl = created.url;\n  } catch(e) {}\n}\n\nreturn [{ json: { ...data, notionContactId, notionContactUrl } }];"
+      },
+      "id": "merge-notion-contact",
+      "name": "Merge Contact Notion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "95a7c8a44cc846bf8f298f4a5203c000",
+          "mode": "id"
+        },
+        "filterType": "string",
+        "filterJson": "={ \"filter\": { \"and\": [ { \"property\": \"Contact\", \"relation\": { \"contains\": \"{{ $json.notionContactId }}\" } }, { \"or\": [ { \"property\": \"Statut\", \"select\": { \"equals\": \"Nouveau\" } }, { \"property\": \"Statut\", \"select\": { \"equals\": \"Qualification\" } }, { \"property\": \"Statut\", \"select\": { \"equals\": \"Proposition\" } }, { \"property\": \"Statut\", \"select\": { \"equals\": \"Negociation\" } } ] } ] } }",
+        "returnAll": false,
+        "limit": 1,
+        "options": {}
+      },
+      "id": "notion-search-transaction",
+      "name": "Notion — Chercher Transaction ouverte",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2200, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "transaction-exists",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "transaction-exists",
+      "name": "Transaction ouverte ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transaction ouverte existe deja — skip creation\nconst data = $('Merge Contact Notion').first().json;\nconst existingTx = $input.first().json;\nreturn [{ json: { ...data, notionTransactionId: existingTx.id, transactionSkipped: true } }];"
+      },
+      "id": "skip-transaction",
+      "name": "Skip — Transaction existe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2640, 200]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "95a7c8a44cc846bf8f298f4a5203c000",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Nom opportunite|title", "textContent": "=Diagnostic CLEAR UP — {{ $('Merge Contact Notion').first().json.companyName || $('Merge Contact Notion').first().json.firstName }}" },
+            { "key": "Contact|relation", "relationValue": ["={{ $('Merge Contact Notion').first().json.notionContactId }}"] },
+            { "key": "Offre|select", "selectValue": "Diagnostic 2 500€" },
+            { "key": "Montant estime HT|number", "numberValue": 2500 },
+            { "key": "Statut|select", "selectValue": "Nouveau" },
+            { "key": "Source|select", "selectValue": "Lead Magnet" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "notion-create-transaction",
+      "name": "Notion — Creer Transaction",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [2640, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge transaction\nconst data = $('Merge Contact Notion').first().json;\nlet notionTransactionId = null;\n\ntry {\n  notionTransactionId = $('Skip — Transaction existe').first().json.notionTransactionId;\n} catch(e) {}\n\nif (!notionTransactionId) {\n  try {\n    notionTransactionId = $('Notion — Creer Transaction').first().json.id;\n  } catch(e) {}\n}\n\nreturn [{ json: { ...data, notionTransactionId } }];"
+      },
+      "id": "merge-transaction",
+      "name": "Merge Transaction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2860, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "75ea7fbbfab947b2a5b91eb832a1c1b7",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            { "key": "Titre|title", "textContent": "=Audit Flash — {{ $json.firstName }} {{ $json.companyName }}" },
+            { "key": "Contact|relation", "relationValue": ["={{ $json.notionContactId }}"] },
+            { "key": "Lead Magnet|relation", "relationValue": ["32f7b60f-7f18-8192-a703-cf3f4c5d4fd5"] },
+            { "key": "Transaction|relation", "relationValue": ["={{ $json.notionTransactionId }}"] },
+            { "key": "Donnees brutes|rich_text", "textContent": "={{ JSON.stringify({ sector: $json.sector, teamSize: $json.teamSize, revenueRange: $json.revenueRange, selectedProcess: $json.selectedProcess, answers: $json.answers, result: $json.result }, null, 2) }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "notion-create-soumission",
+      "name": "Notion — Creer Soumission LM",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [3080, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/smtp/email",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"to\": [{ \"email\": \"{{ $json.email }}\", \"name\": \"{{ $json.firstName }}\" }],\n  \"templateId\": 24,\n  \"params\": {\n    \"firstName\": \"{{ $json.firstName }}\",\n    \"process\": \"{{ $json.selectedProcess }}\",\n    \"cost\": \"{{ Math.round($json.result.annualCost || 0).toLocaleString('fr-FR') }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "brevo-send-rapport",
+      "name": "Brevo — Envoyer Rapport",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3300, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Brevo API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"message\": \"Lead processed successfully\" }",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Repondre OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3520, 300]
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "days"
+      },
+      "id": "wait-3-days",
+      "name": "Attendre 3 jours",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [3520, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/smtp/email",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"to\": [{ \"email\": \"{{ $('Merge Transaction').first().json.email }}\", \"name\": \"{{ $('Merge Transaction').first().json.firstName }}\" }],\n  \"templateId\": 25,\n  \"params\": {\n    \"firstName\": \"{{ $('Merge Transaction').first().json.firstName }}\",\n    \"process\": \"{{ $('Merge Transaction').first().json.selectedProcess }}\",\n    \"cost\": \"{{ Math.round($('Merge Transaction').first().json.result.annualCost || 0).toLocaleString('fr-FR') }}\",\n    \"dailyCost\": \"{{ Math.round(($('Merge Transaction').first().json.result.annualCost || 0) / 365 * 3).toLocaleString('fr-FR') }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "brevo-relance-j3",
+      "name": "Brevo — Relance J+3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3740, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Brevo API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Audit Flash — New Lead\n\nWorkflow de traitement des leads Audit Flash.\n\n**Webhook URL :** POST /webhook/audit-flash-lead\n\n**Flow :**\n1. Validation payload + RGPD\n2. Brevo : chercher/creer contact\n3. Notion CONTACTS : chercher/creer\n4. Notion TRANSACTIONS : creer si pas de doublon ouvert\n5. Notion SOUMISSIONS LM : stocker donnees brutes\n6. Brevo : envoyer email rapport (template 24)\n7. J+3 : relance (template 25)\n\n**Credential requis :**\n- Brevo API Key (Header: api-key)\n- Notion Internal Integration",
+        "height": 400,
+        "width": 450,
+        "color": 5
+      },
+      "id": "note-doc",
+      "name": "Documentation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-300, 200]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Valider Payload", "type": "main", "index": 0 }]]
+    },
+    "Valider Payload": {
+      "main": [[{ "node": "Brevo — Chercher Contact", "type": "main", "index": 0 }]]
+    },
+    "Brevo — Chercher Contact": {
+      "main": [
+        [{ "node": "Contact Brevo existe ?", "type": "main", "index": 0 }],
+        [{ "node": "Contact Brevo existe ?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Contact Brevo existe ?": {
+      "main": [
+        [{ "node": "Brevo — MAJ Contact", "type": "main", "index": 0 }],
+        [{ "node": "Brevo — Creer Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Brevo — MAJ Contact": {
+      "main": [[{ "node": "Merge Brevo", "type": "main", "index": 0 }]]
+    },
+    "Brevo — Creer Contact": {
+      "main": [[{ "node": "Merge Brevo", "type": "main", "index": 0 }]]
+    },
+    "Merge Brevo": {
+      "main": [[{ "node": "Notion — Chercher Contact", "type": "main", "index": 0 }]]
+    },
+    "Notion — Chercher Contact": {
+      "main": [[{ "node": "Contact Notion existe ?", "type": "main", "index": 0 }]]
+    },
+    "Contact Notion existe ?": {
+      "main": [
+        [{ "node": "Notion — MAJ Contact", "type": "main", "index": 0 }],
+        [{ "node": "Notion — Creer Contact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notion — MAJ Contact": {
+      "main": [[{ "node": "Merge Contact Notion", "type": "main", "index": 0 }]]
+    },
+    "Notion — Creer Contact": {
+      "main": [[{ "node": "Merge Contact Notion", "type": "main", "index": 0 }]]
+    },
+    "Merge Contact Notion": {
+      "main": [[{ "node": "Notion — Chercher Transaction ouverte", "type": "main", "index": 0 }]]
+    },
+    "Notion — Chercher Transaction ouverte": {
+      "main": [[{ "node": "Transaction ouverte ?", "type": "main", "index": 0 }]]
+    },
+    "Transaction ouverte ?": {
+      "main": [
+        [{ "node": "Skip — Transaction existe", "type": "main", "index": 0 }],
+        [{ "node": "Notion — Creer Transaction", "type": "main", "index": 0 }]
+      ]
+    },
+    "Skip — Transaction existe": {
+      "main": [[{ "node": "Merge Transaction", "type": "main", "index": 0 }]]
+    },
+    "Notion — Creer Transaction": {
+      "main": [[{ "node": "Merge Transaction", "type": "main", "index": 0 }]]
+    },
+    "Merge Transaction": {
+      "main": [[{ "node": "Notion — Creer Soumission LM", "type": "main", "index": 0 }]]
+    },
+    "Notion — Creer Soumission LM": {
+      "main": [[{ "node": "Brevo — Envoyer Rapport", "type": "main", "index": 0 }]]
+    },
+    "Brevo — Envoyer Rapport": {
+      "main": [
+        [{ "node": "Repondre OK", "type": "main", "index": 0 }],
+        [{ "node": "Attendre 3 jours", "type": "main", "index": 0 }]
+      ]
+    },
+    "Repondre OK": {
+      "main": [[]]
+    },
+    "Attendre 3 jours": {
+      "main": [[{ "node": "Brevo — Relance J+3", "type": "main", "index": 0 }]]
+    },
+    "Brevo — Relance J+3": {
+      "main": [[]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
