@@ -1,5 +1,5 @@
 {
-  "name": "Audit Flash — New Lead",
+  "name": "[ACQ] Webhook → Traiter lead (Audit Flash)",
   "nodes": [
     {
       "parameters": {
@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validation du payload\nconst body = $input.first().json.body;\n\nconst email = (body.email || '').trim().toLowerCase();\nconst firstName = (body.firstName || '').trim();\nconst consentRgpd = body.consentRgpd === true;\n\n// Validation email basique\nconst emailValid = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n\nif (!consentRgpd) {\n  throw new Error('Consentement RGPD manquant');\n}\nif (!emailValid) {\n  throw new Error('Email invalide: ' + email);\n}\nif (!firstName) {\n  throw new Error('Prenom manquant');\n}\n\n// Normaliser le payload\nreturn [{\n  json: {\n    email,\n    firstName,\n    phone: (body.phone || '').trim(),\n    companyName: (body.companyName || '').trim(),\n    sector: body.sector || 'autre',\n    teamSize: body.teamSize || 0,\n    revenueRange: body.revenueRange || '',\n    selectedProcess: body.selectedProcess || '',\n    answers: body.answers || {},\n    result: body.result || {},\n    consentRgpd: true,\n    source: body.source || 'audit-flash',\n    utmCampaign: body.utmCampaign || '',\n    utmMedium: body.utmMedium || '',\n    submittedAt: new Date().toISOString()\n  }\n}];"
+        "jsCode": "// Validation du payload\nconst body = $input.first().json.body;\n\nconst email = (body.email || '').trim().toLowerCase();\nconst firstName = (body.firstName || '').trim();\nconst consentRgpd = body.consentRgpd === true;\n\nconst emailValid = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n\nif (!consentRgpd) {\n  throw new Error('Consentement RGPD manquant');\n}\nif (!emailValid) {\n  throw new Error('Email invalide: ' + email);\n}\nif (!firstName) {\n  throw new Error('Prenom manquant');\n}\n\nreturn [{\n  json: {\n    email,\n    firstName,\n    phone: (body.phone || '').trim(),\n    companyName: (body.companyName || '').trim(),\n    sector: body.sector || 'autre',\n    teamSize: body.teamSize || 0,\n    revenueRange: body.revenueRange || '',\n    selectedProcess: body.selectedProcess || '',\n    answers: body.answers || {},\n    result: body.result || {},\n    consentRgpd: true,\n    source: body.source || 'audit-flash',\n    utmCampaign: body.utmCampaign || '',\n    utmMedium: body.utmMedium || '',\n    submittedAt: new Date().toISOString()\n  }\n}];"
       },
       "id": "validate-payload",
       "name": "Valider Payload",
@@ -29,20 +29,18 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "=https://api.brevo.com/v3/contacts/{{ encodeURIComponent($json.email) }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "options": {}
+        "resource": "contact",
+        "operation": "get",
+        "identifier": "={{ $json.email }}"
       },
       "id": "brevo-get-contact",
       "name": "Brevo — Chercher Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.brevo",
+      "typeVersion": 1,
       "position": [440, 300],
       "credentials": {
-        "httpHeaderAuth": {
-          "name": "Brevo API Key"
+        "brevoApi": {
+          "name": "Brevo account"
         }
       },
       "onError": "continueErrorOutput"
@@ -50,7 +48,7 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
           "conditions": [
             {
               "id": "contact-exists",
@@ -70,51 +68,70 @@
     },
     {
       "parameters": {
-        "method": "PUT",
-        "url": "=https://api.brevo.com/v3/contacts/{{ encodeURIComponent($('Valider Payload').first().json.email) }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"attributes\": {\n    \"PRENOM\": \"{{ $('Valider Payload').first().json.firstName }}\",\n    \"ENTREPRISE\": \"{{ $('Valider Payload').first().json.companyName }}\",\n    \"SECTEUR\": \"{{ $('Valider Payload').first().json.sector }}\",\n    \"AUDIT_PROCESS\": \"{{ $('Valider Payload').first().json.selectedProcess }}\",\n    \"AUDIT_COST\": {{ $('Valider Payload').first().json.result.annualCost || 0 }}\n  },\n  \"listIds\": [14]\n}",
-        "options": {}
+        "resource": "contact",
+        "operation": "update",
+        "identifier": "={{ $('Valider Payload').first().json.email }}",
+        "additionalFields": {
+          "attributes": {
+            "attribute": [
+              { "key": "PRENOM", "value": "={{ $('Valider Payload').first().json.firstName }}" },
+              { "key": "ENTREPRISE", "value": "={{ $('Valider Payload').first().json.companyName }}" },
+              { "key": "SECTEUR", "value": "={{ $('Valider Payload').first().json.sector }}" },
+              { "key": "AUDIT_PROCESS", "value": "={{ $('Valider Payload').first().json.selectedProcess }}" },
+              { "key": "AUDIT_COST", "value": "={{ $('Valider Payload').first().json.result.annualCost || 0 }}" }
+            ]
+          },
+          "listIds": "14"
+        }
       },
       "id": "brevo-update-contact",
       "name": "Brevo — MAJ Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.brevo",
+      "typeVersion": 1,
       "position": [880, 200],
       "credentials": {
-        "httpHeaderAuth": {
-          "name": "Brevo API Key"
+        "brevoApi": {
+          "name": "Brevo account"
         }
       }
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.brevo.com/v3/contacts",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"email\": \"{{ $('Valider Payload').first().json.email }}\",\n  \"attributes\": {\n    \"PRENOM\": \"{{ $('Valider Payload').first().json.firstName }}\",\n    \"ENTREPRISE\": \"{{ $('Valider Payload').first().json.companyName }}\",\n    \"SECTEUR\": \"{{ $('Valider Payload').first().json.sector }}\",\n    \"AUDIT_PROCESS\": \"{{ $('Valider Payload').first().json.selectedProcess }}\",\n    \"AUDIT_COST\": {{ $('Valider Payload').first().json.result.annualCost || 0 }},\n    \"SOURCE\": 5,\n    \"TEMPERATURE\": 1,\n    \"STATUT_COMMERCIAL\": 1,\n    \"SEGMENT\": 2,\n    \"SCORE\": 10\n  },\n  \"listIds\": [14],\n  \"updateEnabled\": false\n}",
-        "options": {}
+        "resource": "contact",
+        "operation": "create",
+        "email": "={{ $('Valider Payload').first().json.email }}",
+        "additionalFields": {
+          "attributes": {
+            "attribute": [
+              { "key": "PRENOM", "value": "={{ $('Valider Payload').first().json.firstName }}" },
+              { "key": "ENTREPRISE", "value": "={{ $('Valider Payload').first().json.companyName }}" },
+              { "key": "SECTEUR", "value": "={{ $('Valider Payload').first().json.sector }}" },
+              { "key": "AUDIT_PROCESS", "value": "={{ $('Valider Payload').first().json.selectedProcess }}" },
+              { "key": "AUDIT_COST", "value": "={{ $('Valider Payload').first().json.result.annualCost || 0 }}" },
+              { "key": "SOURCE", "value": "5" },
+              { "key": "TEMPERATURE", "value": "1" },
+              { "key": "STATUT_COMMERCIAL", "value": "1" },
+              { "key": "SEGMENT", "value": "2" },
+              { "key": "SCORE", "value": "10" }
+            ]
+          },
+          "listIds": "14"
+        }
       },
       "id": "brevo-create-contact",
       "name": "Brevo — Creer Contact",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.brevo",
+      "typeVersion": 1,
       "position": [880, 400],
       "credentials": {
-        "httpHeaderAuth": {
-          "name": "Brevo API Key"
+        "brevoApi": {
+          "name": "Brevo account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Merge : reprendre les donnees validees pour la suite\nconst data = $('Valider Payload').first().json;\n\n// Recuperer le Brevo ID\nlet brevoId = null;\ntry {\n  const brevoResponse = $('Brevo — Chercher Contact').first().json;\n  brevoId = brevoResponse.id || null;\n} catch(e) {}\n\nif (!brevoId) {\n  try {\n    const createResponse = $('Brevo — Creer Contact').first().json;\n    brevoId = createResponse.id || null;\n  } catch(e) {}\n}\n\nreturn [{ json: { ...data, brevoId } }];"
+        "jsCode": "const data = $('Valider Payload').first().json;\nlet brevoId = null;\ntry {\n  brevoId = $('Brevo — Chercher Contact').first().json.id || null;\n} catch(e) {}\nif (!brevoId) {\n  try {\n    brevoId = $('Brevo — Creer Contact').first().json.id || null;\n  } catch(e) {}\n}\nreturn [{ json: { ...data, brevoId } }];"
       },
       "id": "merge-brevo",
       "name": "Merge Brevo",
@@ -168,11 +185,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "update",
-        "pageId": {
-          "__rl": true,
-          "value": "={{ $json.id }}",
-          "mode": "id"
-        },
+        "pageId": { "__rl": true, "value": "={{ $json.id }}", "mode": "id" },
         "propertiesUi": {
           "propertyValues": [
             { "key": "Nom entreprise|rich_text", "textContent": "={{ $('Merge Brevo').first().json.companyName }}" },
@@ -192,11 +205,7 @@
     {
       "parameters": {
         "resource": "databasePage",
-        "databaseId": {
-          "__rl": true,
-          "value": "c9d816644d8b41b38d4defcc9f5ef6d6",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "c9d816644d8b41b38d4defcc9f5ef6d6", "mode": "id" },
         "propertiesUi": {
           "propertyValues": [
             { "key": "Nom complet|title", "textContent": "={{ $('Merge Brevo').first().json.firstName }}" },
@@ -224,7 +233,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Recuperer l'ID du contact Notion (cree ou existant)\nconst data = $('Merge Brevo').first().json;\nlet notionContactId = null;\nlet notionContactUrl = null;\n\ntry {\n  const existing = $('Notion — MAJ Contact').first().json;\n  notionContactId = existing.id;\n  notionContactUrl = existing.url;\n} catch(e) {}\n\nif (!notionContactId) {\n  try {\n    const created = $('Notion — Creer Contact').first().json;\n    notionContactId = created.id;\n    notionContactUrl = created.url;\n  } catch(e) {}\n}\n\nreturn [{ json: { ...data, notionContactId, notionContactUrl } }];"
+        "jsCode": "const data = $('Merge Brevo').first().json;\nlet notionContactId = null;\ntry { notionContactId = $('Notion — MAJ Contact').first().json.id; } catch(e) {}\nif (!notionContactId) {\n  try { notionContactId = $('Notion — Creer Contact').first().json.id; } catch(e) {}\n}\nreturn [{ json: { ...data, notionContactId } }];"
       },
       "id": "merge-notion-contact",
       "name": "Merge Contact Notion",
@@ -236,11 +245,7 @@
       "parameters": {
         "resource": "databasePage",
         "operation": "getAll",
-        "databaseId": {
-          "__rl": true,
-          "value": "95a7c8a44cc846bf8f298f4a5203c000",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "95a7c8a44cc846bf8f298f4a5203c000", "mode": "id" },
         "filterType": "string",
         "filterJson": "={ \"filter\": { \"and\": [ { \"property\": \"Contact\", \"relation\": { \"contains\": \"{{ $json.notionContactId }}\" } }, { \"or\": [ { \"property\": \"Statut\", \"select\": { \"equals\": \"Nouveau\" } }, { \"property\": \"Statut\", \"select\": { \"equals\": \"Qualification\" } }, { \"property\": \"Statut\", \"select\": { \"equals\": \"Proposition\" } }, { \"property\": \"Statut\", \"select\": { \"equals\": \"Negociation\" } } ] } ] } }",
         "returnAll": false,
@@ -258,12 +263,7 @@
         "conditions": {
           "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
           "conditions": [
-            {
-              "id": "transaction-exists",
-              "leftValue": "={{ $json.id }}",
-              "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty" }
-            }
+            { "id": "transaction-exists", "leftValue": "={{ $json.id }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty" } }
           ],
           "combinator": "and"
         }
@@ -276,7 +276,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Transaction ouverte existe deja — skip creation\nconst data = $('Merge Contact Notion').first().json;\nconst existingTx = $input.first().json;\nreturn [{ json: { ...data, notionTransactionId: existingTx.id, transactionSkipped: true } }];"
+        "jsCode": "const data = $('Merge Contact Notion').first().json;\nconst existingTx = $input.first().json;\nreturn [{ json: { ...data, notionTransactionId: existingTx.id, transactionSkipped: true } }];"
       },
       "id": "skip-transaction",
       "name": "Skip — Transaction existe",
@@ -287,11 +287,7 @@
     {
       "parameters": {
         "resource": "databasePage",
-        "databaseId": {
-          "__rl": true,
-          "value": "95a7c8a44cc846bf8f298f4a5203c000",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "95a7c8a44cc846bf8f298f4a5203c000", "mode": "id" },
         "propertiesUi": {
           "propertyValues": [
             { "key": "Nom opportunite|title", "textContent": "=Diagnostic CLEAR UP — {{ $('Merge Contact Notion').first().json.companyName || $('Merge Contact Notion').first().json.firstName }}" },
@@ -312,7 +308,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Merge transaction\nconst data = $('Merge Contact Notion').first().json;\nlet notionTransactionId = null;\n\ntry {\n  notionTransactionId = $('Skip — Transaction existe').first().json.notionTransactionId;\n} catch(e) {}\n\nif (!notionTransactionId) {\n  try {\n    notionTransactionId = $('Notion — Creer Transaction').first().json.id;\n  } catch(e) {}\n}\n\nreturn [{ json: { ...data, notionTransactionId } }];"
+        "jsCode": "const data = $('Merge Contact Notion').first().json;\nlet notionTransactionId = null;\ntry { notionTransactionId = $('Skip — Transaction existe').first().json.notionTransactionId; } catch(e) {}\nif (!notionTransactionId) {\n  try { notionTransactionId = $('Notion — Creer Transaction').first().json.id; } catch(e) {}\n}\nreturn [{ json: { ...data, notionTransactionId } }];"
       },
       "id": "merge-transaction",
       "name": "Merge Transaction",
@@ -323,11 +319,7 @@
     {
       "parameters": {
         "resource": "databasePage",
-        "databaseId": {
-          "__rl": true,
-          "value": "75ea7fbbfab947b2a5b91eb832a1c1b7",
-          "mode": "id"
-        },
+        "databaseId": { "__rl": true, "value": "75ea7fbbfab947b2a5b91eb832a1c1b7", "mode": "id" },
         "propertiesUi": {
           "propertyValues": [
             { "key": "Titre|title", "textContent": "=Audit Flash — {{ $json.firstName }} {{ $json.companyName }}" },
@@ -347,23 +339,28 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.brevo.com/v3/smtp/email",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"to\": [{ \"email\": \"{{ $json.email }}\", \"name\": \"{{ $json.firstName }}\" }],\n  \"templateId\": 24,\n  \"params\": {\n    \"firstName\": \"{{ $json.firstName }}\",\n    \"process\": \"{{ $json.selectedProcess }}\",\n    \"cost\": \"{{ Math.round($json.result.annualCost || 0).toLocaleString('fr-FR') }}\"\n  }\n}",
-        "options": {}
+        "resource": "email",
+        "operation": "send",
+        "templateId": 24,
+        "to": "={{ $json.email }}",
+        "additionalFields": {
+          "params": {
+            "param": [
+              { "key": "firstName", "value": "={{ $json.firstName }}" },
+              { "key": "process", "value": "={{ $json.selectedProcess }}" },
+              { "key": "cost", "value": "={{ Math.round($json.result.annualCost || 0) }}" }
+            ]
+          }
+        }
       },
       "id": "brevo-send-rapport",
       "name": "Brevo — Envoyer Rapport",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.brevo",
+      "typeVersion": 1,
       "position": [3300, 300],
       "credentials": {
-        "httpHeaderAuth": {
-          "name": "Brevo API Key"
+        "brevoApi": {
+          "name": "Brevo account"
         }
       }
     },
@@ -392,31 +389,37 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.brevo.com/v3/smtp/email",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"to\": [{ \"email\": \"{{ $('Merge Transaction').first().json.email }}\", \"name\": \"{{ $('Merge Transaction').first().json.firstName }}\" }],\n  \"templateId\": 25,\n  \"params\": {\n    \"firstName\": \"{{ $('Merge Transaction').first().json.firstName }}\",\n    \"process\": \"{{ $('Merge Transaction').first().json.selectedProcess }}\",\n    \"cost\": \"{{ Math.round($('Merge Transaction').first().json.result.annualCost || 0).toLocaleString('fr-FR') }}\",\n    \"dailyCost\": \"{{ Math.round(($('Merge Transaction').first().json.result.annualCost || 0) / 365 * 3).toLocaleString('fr-FR') }}\"\n  }\n}",
-        "options": {}
+        "resource": "email",
+        "operation": "send",
+        "templateId": 25,
+        "to": "={{ $('Merge Transaction').first().json.email }}",
+        "additionalFields": {
+          "params": {
+            "param": [
+              { "key": "firstName", "value": "={{ $('Merge Transaction').first().json.firstName }}" },
+              { "key": "process", "value": "={{ $('Merge Transaction').first().json.selectedProcess }}" },
+              { "key": "cost", "value": "={{ Math.round($('Merge Transaction').first().json.result.annualCost || 0) }}" },
+              { "key": "dailyCost", "value": "={{ Math.round(($('Merge Transaction').first().json.result.annualCost || 0) / 365 * 3) }}" }
+            ]
+          }
+        }
       },
       "id": "brevo-relance-j3",
       "name": "Brevo — Relance J+3",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.brevo",
+      "typeVersion": 1,
       "position": [3740, 500],
       "credentials": {
-        "httpHeaderAuth": {
-          "name": "Brevo API Key"
+        "brevoApi": {
+          "name": "Brevo account"
         }
       }
     },
     {
       "parameters": {
-        "content": "## Audit Flash — New Lead\n\nWorkflow de traitement des leads Audit Flash.\n\n**Webhook URL :** POST /webhook/audit-flash-lead\n\n**Flow :**\n1. Validation payload + RGPD\n2. Brevo : chercher/creer contact\n3. Notion CONTACTS : chercher/creer\n4. Notion TRANSACTIONS : creer si pas de doublon ouvert\n5. Notion SOUMISSIONS LM : stocker donnees brutes\n6. Brevo : envoyer email rapport (template 24)\n7. J+3 : relance (template 25)\n\n**Credential requis :**\n- Brevo API Key (Header: api-key)\n- Notion Internal Integration",
-        "height": 400,
-        "width": 450,
+        "content": "## [ACQ] Webhook → Traiter lead (Audit Flash)\n\n**Webhook URL :** POST /webhook/audit-flash-lead\n\n**Flow :**\n1. Validation payload + RGPD\n2. Brevo : chercher/creer contact (node natif)\n3. Notion CONTACTS : chercher/creer\n4. Notion TRANSACTIONS : creer si pas de doublon ouvert\n5. Notion SOUMISSIONS LM : stocker donnees brutes\n6. Brevo : envoyer email rapport (template 24)\n7. J+3 : relance (template 25)\n\n**Credentials requis :**\n- Brevo API (credential Brevo natif)\n- Notion Internal Integration\n\n**IDs Notion :**\n- CONTACTS : c9d816644d8b41b38d4defcc9f5ef6d6\n- TRANSACTIONS : 95a7c8a44cc846bf8f298f4a5203c000\n- SOUMISSIONS LM : 75ea7fbbfab947b2a5b91eb832a1c1b7\n- Audit Flash (LEAD MAGNETS) : 32f7b60f-7f18-8192-a703-cf3f4c5d4fd5\n\n**Brevo :**\n- Template rapport : 24\n- Template relance J+3 : 25\n- Liste LM1 : 14",
+        "height": 500,
+        "width": 500,
         "color": 5
       },
       "id": "note-doc",
