@@ -95,7 +95,8 @@ type Props = {
 };
 
 export function Results({ result, processId, auditState }: Props) {
-  const [unlocked, setUnlocked] = useState(false);
+  // TODO: remettre à false quand le webhook n8n est configuré
+  const [unlocked, setUnlocked] = useState(true);
   const [form, setForm] = useState<LeadFormData>({
     firstName: "",
     email: "",
