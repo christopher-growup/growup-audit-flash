@@ -145,12 +145,15 @@ export function Results({ result, processId, auditState }: Props) {
       utmMedium: params.get("utm_medium") || null,
     };
 
-    const { ok } = await submitLead(payload);
-
-    if (ok) {
-      setStatus("sent");
-      setUnlocked(true);
-    } else {
+    try {
+      const { ok } = await submitLead(payload);
+      if (ok) {
+        setStatus("sent");
+        setUnlocked(true);
+      } else {
+        setStatus("error");
+      }
+    } catch {
       setStatus("error");
     }
   };
