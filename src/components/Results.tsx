@@ -7,6 +7,87 @@ import { SolutionStack } from "./results/SolutionStack";
 import { PROCESSES, SECTORS, REVENUE_RANGES } from "../lib/constants";
 import { submitLead } from "../lib/submitLead";
 
+type LockedMessage = {
+  badge: string | null;
+  badgeClass: string;
+  title: React.ReactNode;
+  subtitle: string;
+};
+
+function getLockedMessage(annualCost: number, processLabel: string): LockedMessage {
+  const label = <span className="text-fire">{processLabel}</span>;
+
+  // Moins de 5 000 € — pas d'alarme, juste de l'optimisation
+  if (annualCost < 5_000) {
+    return {
+      badge: null,
+      badgeClass: "",
+      title: <>Ce processus n'est pas votre plus gros levier — mais il reste des gains à saisir.</>,
+      subtitle:
+        "On a quand même identifié des pertes de temps évitables sur votre processus de " +
+        processLabel +
+        ". Voici le détail.",
+    };
+  }
+
+  // 5 000 – 20 000 € — coût réel mais pas alarmant
+  if (annualCost < 20_000) {
+    return {
+      badge: "À optimiser",
+      badgeClass: "text-yellow-400",
+      title: <>Votre processus de {label} vous coûte plus cher qu'il ne devrait.</>,
+      subtitle:
+        "Pas d'urgence absolue, mais ce que vous laissez sur la table chaque année mérite d'être regardé de près.",
+    };
+  }
+
+  // 20 000 – 60 000 € — fuite significative
+  if (annualCost < 60_000) {
+    return {
+      badge: "Point d'attention",
+      badgeClass: "text-orange-400",
+      title: (
+        <>On a identifié une fuite opérationnelle réelle sur votre processus de {label}.</>
+      ),
+      subtitle:
+        "Le coût annuel est au-dessus de la moyenne de votre secteur. Voici ce qui se passe concrètement chez vous.",
+    };
+  }
+
+  // 60 000 – 150 000 € — perte sérieuse, à l'échelle d'un recrutement
+  if (annualCost < 150_000) {
+    return {
+      badge: "Signal fort",
+      badgeClass: "text-red-400",
+      title: (
+        <>
+          Ce processus vous coûte chaque année l'équivalent d'un recrutement à temps plein.
+        </>
+      ),
+      subtitle:
+        "Les pertes identifiées sur votre processus de " +
+        processLabel +
+        " sont significativement au-dessus des benchmarks de votre secteur.",
+    };
+  }
+
+  // > 150 000 € — situation critique
+  return {
+    badge: "Diagnostic sérieux",
+    badgeClass: "text-red-500",
+    title: (
+      <>
+        Les pertes identifiées sur ce processus dépassent ce que la plupart des dirigeants
+        imaginent.
+      </>
+    ),
+    subtitle:
+      "Ce n'est pas une estimation théorique — c'est le résultat de votre propre situation sur le processus de " +
+      processLabel +
+      ".",
+  };
+}
+
 type Props = {
   result: AuditResult;
   processId: ProcessId;
@@ -85,16 +166,22 @@ export function Results({ result, processId, auditState }: Props) {
         /* ── Locked: teaser + blurred cost + email form ── */
         <div className="flex flex-col items-center">
           <div className="text-center mb-10">
-            <p className="text-red-400 font-bold text-lg uppercase tracking-wide mb-4">
-              Alerte rouge
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold mb-4">
-              Notre algorithme a détecté une hémorragie financière critique sur votre
-              processus de <span className="text-fire">{processLabel}</span>.
-            </h2>
-            <p className="text-midnight-lighter text-lg">
-              Le coût annuel dépasse largement la moyenne de votre secteur.
-            </p>
+            {(() => {
+              const msg = getLockedMessage(result.annualCost, processLabel);
+              return (
+                <>
+                  {msg.badge && (
+                    <p
+                      className={`font-bold text-sm uppercase tracking-widest mb-4 ${msg.badgeClass}`}
+                    >
+                      {msg.badge}
+                    </p>
+                  )}
+                  <h2 className="text-2xl md:text-3xl font-bold mb-4">{msg.title}</h2>
+                  <p className="text-midnight-lighter text-lg">{msg.subtitle}</p>
+                </>
+              );
+            })()}
           </div>
 
           {/* Blurred cost teaser */}

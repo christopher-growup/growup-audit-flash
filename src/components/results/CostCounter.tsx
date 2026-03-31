@@ -41,7 +41,8 @@ export function CostCounter({ annualCost, costBreakdown, processId }: Props) {
       className="text-center py-10"
     >
       <p className="text-midnight-lighter text-lg mb-4">
-        Votre processus de <span className="text-fire font-semibold">{processTitle.toLowerCase()}</span> vous coûte
+        On estime que votre processus de{" "}
+        <span className="text-fire font-semibold">{processTitle.toLowerCase()}</span> vous coûte
       </p>
       <p className="text-5xl md:text-7xl font-bold font-mono text-fire-light">
         {formatted} €<span className="text-2xl md:text-3xl text-midnight-lighter">/an</span>
@@ -56,6 +57,10 @@ export function CostCounter({ annualCost, costBreakdown, processId }: Props) {
           </div>
         ))}
       </div>
+      <p className="text-xs text-midnight-light mt-6 max-w-lg mx-auto">
+        * Estimation indicative basée sur vos paramètres et les benchmarks de notre secteur.
+        L'Audit CLEAR UP permet d'affiner ce diagnostic avec vos données réelles.
+      </p>
     </motion.div>
   );
 }
