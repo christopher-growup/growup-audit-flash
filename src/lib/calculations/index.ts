@@ -5,7 +5,7 @@ import { calculateFacturation } from "./facturation";
 import { calculateCommercial } from "./commercial";
 import { calculateOnboarding } from "./onboarding";
 import { calculateAdmin } from "./admin";
-import { SUGGESTED_STACKS, AUTOMATION_MONTHLY_COST, PROCESSES } from "../constants";
+import { SUGGESTED_STACKS, AUTOMATION_MONTHLY_COST, PROCESSES, ESTIMATED_SCORES } from "../constants";
 
 const calculators: Record<ProcessId, (answers: any, sector: Sector, revenue: RevenueRange) => { annualCost: number; costBreakdown: { label: string; amount: number }[] }> = {
   relances: calculateRelances,
@@ -52,7 +52,7 @@ export function calculateProcess(
   const radarScores: RadarScores = {} as RadarScores;
   for (const p of PROCESSES) {
     radarScores[p.id] = {
-      score: p.id === processId ? selectedScore : 0,
+      score: p.id === processId ? selectedScore : ESTIMATED_SCORES[sector][p.id],
       locked: p.id !== processId,
     };
   }

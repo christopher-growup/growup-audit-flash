@@ -95,8 +95,7 @@ type Props = {
 };
 
 export function Results({ result, processId, auditState }: Props) {
-  // TODO: remettre à false quand le webhook n8n est configuré
-  const [unlocked, setUnlocked] = useState(true);
+  const [unlocked, setUnlocked] = useState(false);
   const [form, setForm] = useState<LeadFormData>({
     firstName: "",
     email: "",
@@ -146,17 +145,12 @@ export function Results({ result, processId, auditState }: Props) {
       utmMedium: params.get("utm_medium") || null,
     };
 
-    try {
-      const { ok } = await submitLead(payload);
-      if (ok) {
-        setStatus("sent");
-        setUnlocked(true);
-      } else {
-        setStatus("error");
-      }
-    } catch {
-      setStatus("error");
-    }
+    // Débloque immédiatement — le webhook tourne en arrière-plan
+    setStatus("sent");
+    setUnlocked(true);
+
+    // Fire & forget — on ne bloque pas sur la réponse du webhook
+    submitLead(payload).catch(console.error);
   };
 
   return (
